@@ -28,6 +28,14 @@ celery_app.conf.update(
             "task": "app.tasks.ingest.fetch_reddit",
             "schedule": 900.0,
         },
+        "alpha-vantage-poll": {
+            "task": "app.tasks.ingest.fetch_alpha_vantage",
+            "schedule": 900.0,
+        },
+        "sec-edgar-poll": {
+            "task": "app.tasks.ingest.fetch_sec_edgar",
+            "schedule": 1800.0,
+        },
         "reliability-batch": {
             "task": "app.tasks.reliability.run_nightly_backtest",
             "schedule": crontab(hour=23, minute=0),

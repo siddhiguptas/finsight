@@ -9,6 +9,8 @@ from app.models.schemas import NewsArticle, TickerSectorMap, IngestionJobLog
 from app.ingestion.newsapi_client import NewsAPIClient
 from app.ingestion.rss_scraper import RSSScraper
 from app.ingestion.reddit_client import RedditClient
+from app.ingestion.alpha_vantage_client import AlphaVantageClient
+from app.ingestion.sec_client import SECEdgarClient
 from app.processing.deduplicator import compute_content_hash, is_duplicate
 from app.core.redis import redis_client
 
@@ -140,6 +142,30 @@ def fetch_reddit():
     async def _run():
         client = RedditClient()
         await run_ingestion("reddit_poll", client.fetch())
+    
+    asyncio.run(_run())
+    return {"status": "done"}
+
+@shared_task(name="app.tasks.ingest.fetch_alpha_vantage")
+def fetch_alpha_vantage():
+    async def _run():
+        client = AlphaVantageClient()
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(TickerSectorMap.ticker).limit(10))
+            tickers = [r[0] for r in res]
+        await run_ingestion("alpha_vantage_poll", client.fetch(tickers))
+    
+    asyncio.run(_run())
+    return {"status": "done"}
+
+@shared_task(name="app.tasks.ingest.fetch_sec_edgar")
+def fetch_sec_edgar():
+    async def _run():
+        client = SECEdgarClient()
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(TickerSectorMap.ticker).limit(10))
+            tickers = [r[0] for r in res]
+        await run_ingestion("sec_edgar_poll", client.fetch(tickers))
     
     asyncio.run(_run())
     return {"status": "done"}

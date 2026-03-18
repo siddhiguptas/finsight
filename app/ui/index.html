@@ -75,6 +75,11 @@
       font-size: 14px;
     }
 
+    input:focus, select:focus {
+      outline: 2px solid var(--primary);
+      border-color: var(--primary);
+    }
+
     button {
       background: var(--primary);
       color: #fff;
@@ -86,6 +91,14 @@
 
     button:hover {
       background: var(--primary-strong);
+    }
+
+    button.secondary {
+      background: #6c757d;
+    }
+
+    button.secondary:hover {
+      background: #5a6268;
     }
 
     .card {
@@ -155,6 +168,28 @@
       border: 1px solid #d2eaef;
     }
 
+    .auth-section {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+
+    .auth-section .field {
+      flex: 1;
+    }
+
+    .auth-section input {
+      width: 100%;
+    }
+
+    .auth-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
     @media (max-width: 860px) {
       .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -174,6 +209,20 @@
     <p>Use this page to verify if your API feed is returning articles correctly.</p>
 
     <div class="card">
+      <div class="auth-section">
+        <div class="field">
+          <label for="userId">User ID (for token generation)</label>
+          <input id="userId" type="text" placeholder="Enter user ID or leave empty for test" value="550e8400-e29b-41d4-a716-446655440000" />
+        </div>
+        <div class="field">
+          <label for="token">JWT Token</label>
+          <input id="token" type="password" placeholder="Token will appear here" />
+        </div>
+        <div class="auth-buttons">
+          <button id="getTokenBtn" class="secondary">Get Token</button>
+        </div>
+      </div>
+
       <div class="grid">
         <div class="field">
           <label for="tier">Tier</label>
@@ -212,6 +261,9 @@
     const statusEl = document.getElementById("status");
     const resultsEl = document.getElementById("results");
     const loadBtn = document.getElementById("loadBtn");
+    const tokenInput = document.getElementById("token");
+    const getTokenBtn = document.getElementById("getTokenBtn");
+    const userIdInput = document.getElementById("userId");
 
     function setStatus(text, kind) {
       const dotClass = kind === "ok" ? "ok" : kind === "err" ? "err" : "";
@@ -248,7 +300,32 @@
       }).join("");
     }
 
+    async function getToken() {
+      const userId = userIdInput.value.trim() || "550e8400-e29b-41d4-a716-446655440000";
+      
+      try {
+        const res = await fetch("/api/v1/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, role: "student" })
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          setStatus(`Token error: ${err.detail || res.status}`, "err");
+          return;
+        }
+        
+        const data = await res.json();
+        tokenInput.value = data.access_token;
+        setStatus("Token generated successfully!", "ok");
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, "err");
+      }
+    }
+
     async function loadFeed() {
+      const token = tokenInput.value.trim();
       const tier = document.getElementById("tier").value;
       const tickersRaw = document.getElementById("tickers").value.trim();
       const sector = document.getElementById("sector").value.trim();
@@ -271,7 +348,15 @@
       resultsEl.innerHTML = "";
 
       try {
-        const res = await fetch(url);
+        const headers = {
+          "Content-Type": "application/json"
+        };
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(url, { headers });
         const data = await res.json();
 
         if (!res.ok) {
@@ -288,6 +373,7 @@
     }
 
     loadBtn.addEventListener("click", loadFeed);
+    getTokenBtn.addEventListener("click", getToken);
 
     (async () => {
       try {

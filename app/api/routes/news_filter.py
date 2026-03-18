@@ -6,6 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db_session
+from app.core.auth import get_current_user
 from app.models.api_models import NewsArticleResponse, NewsFeedResponse
 from app.models.schemas import (
     NewsArticle,
@@ -40,6 +41,7 @@ async def filter_news(
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """Advanced filtering endpoint for the news feed UI."""
     ticker_list = _parse_csv(tickers)
@@ -150,6 +152,7 @@ async def search_news(
     min_reliability: float = Query(0.0, ge=0.0, le=1.0),
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """Search articles by text, sentiment, impact, and source reliability."""
     query = (

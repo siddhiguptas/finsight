@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import case, desc, func, select
 from app.core.database import get_db_session
+from app.core.auth import get_current_user
 from app.models.schemas import ModelReliabilityStats, NewsReliabilityScore, SourceReliabilityStats
 
 router = APIRouter()
@@ -9,9 +10,9 @@ router = APIRouter()
 @router.get("/sources")
 async def get_source_reliability(
     limit: int = 10,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Get credibility stats for news sources (e.g. SeekingAlpha vs NewsAPI)."""
     result = await db.execute(
         select(SourceReliabilityStats).order_by(desc(SourceReliabilityStats.accuracy_24h)).limit(limit)
     )
@@ -22,8 +23,8 @@ async def get_source_reliability(
 async def get_source_reliability_detail(
     source_name: str,
     db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Return reliability stats for a specific news source."""
     result = await db.execute(
         select(SourceReliabilityStats).where(SourceReliabilityStats.source_name == source_name)
     )
@@ -54,8 +55,8 @@ async def get_source_reliability_detail(
 async def get_ticker_reliability(
     ticker: str,
     db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Return rolling reliability stats for a specific ticker."""
     ticker = ticker.upper()
 
     total_res = await db.execute(
@@ -115,8 +116,8 @@ async def get_ticker_reliability(
 
 @router.get("/models")
 async def get_model_reliability(
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Get accuracy stats for the AI models (FinBERT vs Gemini)."""
     result = await db.execute(select(ModelReliabilityStats))
     return result.scalars().all()

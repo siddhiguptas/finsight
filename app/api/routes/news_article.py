@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db_session
+from app.core.auth import get_current_user
 from app.models.schemas import NewsArticle, NewsSentimentAnalysis, NewsStockTag, NewsSectorTag, SourceReliabilityStats
 from app.models.api_models import NewsArticleResponse
 from uuid import UUID
@@ -11,11 +12,9 @@ router = APIRouter()
 @router.get("/{article_id}", response_model=NewsArticleResponse)
 async def get_article_details(
     article_id: UUID,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Fetch full metadata and analysis for a specific article."""
-    
-    # Get Article & Analysis
     query = (
         select(NewsArticle, NewsSentimentAnalysis, SourceReliabilityStats.accuracy_24h)
         .outerjoin(NewsSentimentAnalysis, NewsArticle.id == NewsSentimentAnalysis.article_id)
@@ -31,7 +30,6 @@ async def get_article_details(
         
     art, analysis, source_rel = row
     
-    # Get Tags
     ticker_result = await db.execute(select(NewsStockTag.ticker).where(NewsStockTag.article_id == art.id))
     sector_result = await db.execute(select(NewsSectorTag.sector_name).where(NewsSectorTag.article_id == art.id))
     
@@ -57,7 +55,7 @@ async def get_article_details(
 @router.get("/article/{article_id}", response_model=NewsArticleResponse)
 async def get_article_details_alias(
     article_id: UUID,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Alias for plan-compatible path: GET /api/v1/news/article/{id}."""
-    return await get_article_details(article_id, db)
+    return await get_article_details(article_id, db, current_user)

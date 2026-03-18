@@ -21,5 +21,6 @@ pandas
 yfinance
 praw
 pytest
+python-jose
 python-dotenv
 beautifulsoup4

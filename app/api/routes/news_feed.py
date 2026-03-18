@@ -7,6 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db_session
+from app.core.auth import get_current_user
 from app.models.api_models import NewsArticleResponse, NewsFeedResponse
 from app.models.schemas import (
     NewsArticle,
@@ -20,10 +21,18 @@ from app.models.schemas import (
 
 router = APIRouter()
 
+
+def parse_ticker_list(tickers_str: Optional[str]) -> Optional[List[str]]:
+    """Parse comma-separated ticker string into a list of tickers."""
+    if tickers_str is None:
+        return None
+    # Split by comma and strip whitespace
+    return [t.strip().upper() for t in tickers_str.split(',') if t.strip()]
+
 @router.get("/feed", response_model=NewsFeedResponse)
 async def get_news_feed(
     tier: str = Query("general", enum=["portfolio", "sector", "general", "market"]),
-    tickers: Optional[List[str]] = Query(None),
+    tickers: Optional[str] = Query(None, description="Comma-separated list of stock tickers"),
     sector: Optional[str] = Query(None),
     user_id: Optional[UUID] = Query(None),
     impact_level: Optional[str] = Query(None, enum=["HIGH", "MEDIUM", "LOW"]),
@@ -32,7 +41,8 @@ async def get_news_feed(
     sentiment: Optional[str] = Query(None, enum=["POSITIVE", "NEGATIVE", "NEUTRAL"]),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get news feed based on tiers.
@@ -40,6 +50,8 @@ async def get_news_feed(
     - portfolio: News for specific tickers. If no tickers provided, use user's watchlist.
     - sector: News for a specific industry/sector.
     """
+    # Parse comma-separated tickers into a list
+    target_tickers = parse_ticker_list(tickers)
     if tier == "market":
         tier = "general"
 
@@ -59,7 +71,6 @@ async def get_news_feed(
     )
 
     if tier == "portfolio":
-        target_tickers = tickers
         if not target_tickers and user_id:
             # Fetch from watchlist
             res = await db.execute(select(UserWatchlist.ticker).where(UserWatchlist.user_id == user_id))
@@ -153,6 +164,7 @@ async def get_watchlist_feed(
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user)
 ):
     """News feed for a user's watchlist (alias of portfolio tier)."""
     return await get_news_feed(
