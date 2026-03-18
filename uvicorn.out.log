@@ -1,0 +1,4 @@
+INFO:     127.0.0.1:62177 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62177 - "GET /api/v1/news/feed?tier=general&limit=3&time_window=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62177 - "GET /api/v1/news/filter?limit=3&time_window=24&sort_by=published_at HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62177 - "GET /api/v1/news/reliability/sources HTTP/1.1" 200 OK

@@ -1,0 +1,1 @@
+"""FinSight news backend package."""

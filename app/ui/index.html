@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinSight News - Quick UI</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #132238;
+      --muted: #5f6f85;
+      --primary: #0b7285;
+      --primary-strong: #0a5f70;
+      --line: #d8e0ea;
+      --good: #2f9e44;
+      --bad: #e03131;
+      --shadow: 0 10px 25px rgba(13, 36, 61, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 5% 0%, #d7f2f7 0%, transparent 32%),
+                  radial-gradient(circle at 100% 0%, #eef7ff 0%, transparent 40%),
+                  var(--bg);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 36px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+
+    p {
+      margin-top: 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input, select, button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      height: 40px;
+      padding: 0 10px;
+      font-size: 14px;
+    }
+
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background: var(--primary-strong);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid #e6edf5;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-top: 14px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      margin: 10px 0;
+      min-height: 20px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #adb5bd;
+    }
+
+    .dot.ok { background: var(--good); }
+    .dot.err { background: var(--bad); }
+
+    .results {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .item {
+      border: 1px solid #e8edf3;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .item h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .chip {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #edf6f8;
+      color: #0b6170;
+      border: 1px solid #d2eaef;
+    }
+
+    @media (max-width: 860px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 520px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>FinSight News Quick UI</h1>
+    <p>Use this page to verify if your API feed is returning articles correctly.</p>
+
+    <div class="card">
+      <div class="grid">
+        <div class="field">
+          <label for="tier">Tier</label>
+          <select id="tier">
+            <option value="general" selected>general</option>
+            <option value="market">market</option>
+            <option value="portfolio">portfolio</option>
+            <option value="sector">sector</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="tickers">Tickers (comma separated)</label>
+          <input id="tickers" placeholder="AAPL,MSFT" />
+        </div>
+
+        <div class="field">
+          <label for="sector">Sector</label>
+          <input id="sector" placeholder="Technology" />
+        </div>
+
+        <div class="field">
+          <label for="limit">Limit</label>
+          <input id="limit" type="number" min="1" max="50" value="10" />
+        </div>
+      </div>
+
+      <button id="loadBtn">Load Feed</button>
+      <div class="status" id="status"><span class="dot"></span><span>Idle</span></div>
+
+      <div class="results" id="results"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
+    const loadBtn = document.getElementById("loadBtn");
+
+    function setStatus(text, kind) {
+      const dotClass = kind === "ok" ? "ok" : kind === "err" ? "err" : "";
+      statusEl.innerHTML = `<span class="dot ${dotClass}"></span><span>${text}</span>`;
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return "Unknown date";
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+    }
+
+    function renderArticles(data) {
+      const articles = data.articles || [];
+      if (!articles.length) {
+        resultsEl.innerHTML = "<div class='item'>No articles returned.</div>";
+        return;
+      }
+
+      resultsEl.innerHTML = articles.map((a) => {
+        const chips = [];
+        if (a.sentiment_label) chips.push(`<span class='chip'>${a.sentiment_label}</span>`);
+        if (a.impact_level) chips.push(`<span class='chip'>Impact: ${a.impact_level}</span>`);
+        if (Array.isArray(a.tickers)) a.tickers.forEach((t) => chips.push(`<span class='chip'>${t}</span>`));
+
+        return `
+          <div class="item">
+            <h3>${a.title || "Untitled"}</h3>
+            <div class="meta">${a.source_name || "Unknown source"} • ${fmtDate(a.published_at)} • Reliability: ${a.reliability_score ?? "n/a"}</div>
+            <div>${a.summary || "No summary"}</div>
+            <div class="chips">${chips.join("")}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadFeed() {
+      const tier = document.getElementById("tier").value;
+      const tickersRaw = document.getElementById("tickers").value.trim();
+      const sector = document.getElementById("sector").value.trim();
+      const limit = document.getElementById("limit").value || "10";
+
+      const params = new URLSearchParams();
+      params.set("tier", tier);
+      params.set("limit", limit);
+
+      if (tickersRaw) {
+        tickersRaw.split(",").map(t => t.trim()).filter(Boolean).forEach(t => params.append("tickers", t));
+      }
+
+      if (sector) {
+        params.set("sector", sector);
+      }
+
+      const url = `/api/v1/news/feed?${params.toString()}`;
+      setStatus("Loading...", "");
+      resultsEl.innerHTML = "";
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!res.ok) {
+          setStatus(`Error ${res.status}: ${data.detail || "Request failed"}`, "err");
+          resultsEl.innerHTML = "";
+          return;
+        }
+
+        setStatus(`Success. Articles: ${data.count ?? 0}`, "ok");
+        renderArticles(data);
+      } catch (err) {
+        setStatus(`Network error: ${err.message}`, "err");
+      }
+    }
+
+    loadBtn.addEventListener("click", loadFeed);
+
+    (async () => {
+      try {
+        const res = await fetch("/health");
+        if (res.ok) {
+          setStatus("API reachable. Ready.", "ok");
+        } else {
+          setStatus("API not healthy.", "err");
+        }
+      } catch (err) {
+        setStatus("API not reachable.", "err");
+      }
+    })();
+  </script>
+</body>
+</html>
