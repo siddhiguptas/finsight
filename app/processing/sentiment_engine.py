@@ -1,4 +1,4 @@
-import google.generativeai as genai
+import google.genai as genai
 from transformers import pipeline
 from tenacity import retry, stop_after_attempt, wait_exponential
 

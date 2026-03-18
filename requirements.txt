@@ -15,7 +15,7 @@ newspaper3k
 spacy
 transformers
 torch
-google-generativeai
+google-genai
 tenacity
 pandas
 yfinance
@@ -24,3 +24,5 @@ pytest
 python-jose
 python-dotenv
 beautifulsoup4
+gevent==24.2.1
+gevent

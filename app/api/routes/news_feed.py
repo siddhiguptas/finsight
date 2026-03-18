@@ -77,7 +77,8 @@ async def get_news_feed(
             target_tickers = [r[0] for r in res.all()]
 
         if not target_tickers:
-            raise HTTPException(status_code=400, detail="Tickers or user_id (with watchlist) required for portfolio tier")
+            # If no tickers found, return empty response instead of error
+            return NewsFeedResponse(articles=[], count=0, tier="portfolio")
             
         query = query.join(NewsStockTag, NewsArticle.id == NewsStockTag.article_id).where(NewsStockTag.ticker.in_(target_tickers))
 

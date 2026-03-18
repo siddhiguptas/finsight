@@ -1,3 +1,5 @@
+
+import logging
 import asyncio
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -13,6 +15,8 @@ from app.ingestion.alpha_vantage_client import AlphaVantageClient
 from app.ingestion.sec_client import SECEdgarClient
 from app.processing.deduplicator import compute_content_hash, is_duplicate
 from app.core.redis import redis_client
+
+logger = logging.getLogger(__name__)
 
 async def save_article(article_data: dict):
     def parse_published_at(value: str) -> datetime:
@@ -114,19 +118,31 @@ async def run_ingestion(job_name: str, fetch_coro):
 
 @shared_task(name="app.tasks.ingest.fetch_newsapi")
 def fetch_newsapi():
+    """Fetch news from NewsAPI."""
+    import asyncio
+    
     async def _run():
         client = NewsAPIClient()
-        # Get some tickers to search for
         async with AsyncSessionLocal() as session:
             res = await session.execute(select(TickerSectorMap.ticker).limit(10))
             tickers = [r[0] for r in res]
         await run_ingestion("newsapi_poll", client.fetch(tickers))
     
-    asyncio.run(_run())
+    # Run async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    
     return {"status": "done"}
 
 @shared_task(name="app.tasks.ingest.fetch_yahoo_rss")
 def fetch_yahoo_rss():
+    """Fetch news from Yahoo RSS."""
+    import asyncio
+    
     async def _run():
         client = RSSScraper()
         async with AsyncSessionLocal() as session:
@@ -134,20 +150,40 @@ def fetch_yahoo_rss():
             tickers = [r[0] for r in res]
         await run_ingestion("yahoo_rss_poll", client.fetch(tickers))
     
-    asyncio.run(_run())
+    # Run async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    
     return {"status": "done"}
 
 @shared_task(name="app.tasks.ingest.fetch_reddit")
 def fetch_reddit():
+    """Fetch news from Reddit."""
+    import asyncio
+    
     async def _run():
         client = RedditClient()
         await run_ingestion("reddit_poll", client.fetch())
     
-    asyncio.run(_run())
+    # Run async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    
     return {"status": "done"}
 
 @shared_task(name="app.tasks.ingest.fetch_alpha_vantage")
 def fetch_alpha_vantage():
+    """Fetch news from Alpha Vantage."""
+    import asyncio
+    
     async def _run():
         client = AlphaVantageClient()
         async with AsyncSessionLocal() as session:
@@ -155,11 +191,21 @@ def fetch_alpha_vantage():
             tickers = [r[0] for r in res]
         await run_ingestion("alpha_vantage_poll", client.fetch(tickers))
     
-    asyncio.run(_run())
+    # Run async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    
     return {"status": "done"}
 
 @shared_task(name="app.tasks.ingest.fetch_sec_edgar")
 def fetch_sec_edgar():
+    """Fetch news from SEC EDGAR."""
+    import asyncio
+    
     async def _run():
         client = SECEdgarClient()
         async with AsyncSessionLocal() as session:
@@ -167,5 +213,13 @@ def fetch_sec_edgar():
             tickers = [r[0] for r in res]
         await run_ingestion("sec_edgar_poll", client.fetch(tickers))
     
-    asyncio.run(_run())
+    # Run async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    finally:
+        loop.close()
+    
     return {"status": "done"}
+

@@ -10,8 +10,12 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(
-        default="postgresql+asyncpg://user:password@postgres:5432/finsight",
+        default="postgresql://user:password@postgres:5432/finsight",
         alias="DATABASE_URL",
+    )
+    async_database_url: str = Field(
+        default="postgresql+asyncpg://user:password@postgres:5432/finsight",
+        alias="ASYNC_DATABASE_URL",
     )
     mongo_uri: str = Field(default="mongodb://mongo:27017/finsight", alias="MONGO_URI")
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")

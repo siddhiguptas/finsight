@@ -1,5 +1,4 @@
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import yfinance as yf
 from celery import shared_task
@@ -152,5 +151,9 @@ async def run_reliability_check():
 
 @shared_task(name="app.tasks.reliability.run_nightly_backtest")
 def run_nightly_backtest():
-    asyncio.run(run_reliability_check())
+    try:
+        from gevent import spawn
+        spawn(lambda: asyncio.run(run_reliability_check())).join()
+    except ImportError:
+        asyncio.run(run_reliability_check())
     return {"status": "success"}
