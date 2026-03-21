@@ -48,6 +48,11 @@
       color: var(--muted);
     }
 
+    .muted {
+      color: var(--muted);
+      margin-top: 0;
+    }
+
     .grid {
       display: grid;
       gap: 12px;
@@ -135,6 +140,12 @@
       margin-top: 10px;
     }
 
+    .explanation {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
     .item {
       border: 1px solid #e8edf3;
       border-radius: 10px;
@@ -168,28 +179,6 @@
       border: 1px solid #d2eaef;
     }
 
-    .auth-section {
-      background: #f8fafc;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 14px;
-    }
-
-    .auth-section .field {
-      flex: 1;
-    }
-
-    .auth-section input {
-      width: 100%;
-    }
-
-    .auth-buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
     @media (max-width: 860px) {
       .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -206,54 +195,92 @@
 <body>
   <div class="wrap">
     <h1>FinSight News Quick UI</h1>
-    <p>Use this page to verify if your API feed is returning articles correctly.</p>
+    <p>Use this page to verify the live feed is returning fresh, ticker-focused news.</p>
 
     <div class="card">
-      <div class="auth-section">
-        <div class="field">
-          <label for="userId">User ID (for token generation)</label>
-          <input id="userId" type="text" placeholder="Enter user ID or leave empty for test" value="550e8400-e29b-41d4-a716-446655440000" />
-        </div>
-        <div class="field">
-          <label for="token">JWT Token</label>
-          <input id="token" type="password" placeholder="Token will appear here" />
-        </div>
-        <div class="auth-buttons">
-          <button id="getTokenBtn" class="secondary">Get Token</button>
-        </div>
-      </div>
-
       <div class="grid">
-        <div class="field">
-          <label for="tier">Tier</label>
-          <select id="tier">
-            <option value="general" selected>general</option>
-            <option value="market">market</option>
-            <option value="portfolio">portfolio</option>
-            <option value="sector">sector</option>
-          </select>
-        </div>
-
         <div class="field">
           <label for="tickers">Tickers (comma separated)</label>
           <input id="tickers" placeholder="AAPL,MSFT" />
         </div>
 
         <div class="field">
-          <label for="sector">Sector</label>
-          <input id="sector" placeholder="Technology" />
+          <label for="companyNames">Company Names (optional)</label>
+          <input id="companyNames" placeholder="Apple, Microsoft" />
+        </div>
+
+        <div class="field">
+          <label for="market">Market</label>
+          <input id="market" placeholder="US" />
+        </div>
+
+        <div class="field">
+          <label for="timeWindow">Time Window (hours)</label>
+          <input id="timeWindow" type="number" min="1" max="168" value="24" />
         </div>
 
         <div class="field">
           <label for="limit">Limit</label>
           <input id="limit" type="number" min="1" max="50" value="10" />
         </div>
+
+        <div class="field">
+          <label for="explanationDetail">Explanation Detail</label>
+          <select id="explanationDetail">
+            <option value="short">short</option>
+            <option value="medium" selected>medium</option>
+            <option value="detailed">detailed</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="sources">Sources (optional)</label>
+          <input id="sources" placeholder="newsapi,yahoo_rss,google_news_rss" />
+        </div>
       </div>
 
       <button id="loadBtn">Load Feed</button>
+      <p class="muted" style="margin:8px 0 0;">
+        Feed uses fast analysis to avoid Gemini rate limits. Click "Analyze" per item for full explanation.
+      </p>
       <div class="status" id="status"><span class="dot"></span><span>Idle</span></div>
 
       <div class="results" id="results"></div>
+    </div>
+
+    <div class="card">
+      <h2>Analyze Text</h2>
+      <p class="muted">Run the analysis pipeline on a single title + content.</p>
+
+      <div class="grid">
+        <div class="field">
+          <label for="anTitle">Title</label>
+          <input id="anTitle" placeholder="Apple reports strong quarterly earnings" />
+        </div>
+
+        <div class="field">
+          <label for="anTicker">Ticker (optional)</label>
+          <input id="anTicker" placeholder="AAPL" />
+        </div>
+
+        <div class="field" style="grid-column: span 2;">
+          <label for="anContent">Content</label>
+          <input id="anContent" placeholder="Apple reported revenue growth and strong iPhone sales..." />
+        </div>
+
+        <div class="field">
+          <label for="anDetail">Explanation Detail</label>
+          <select id="anDetail">
+            <option value="short">short</option>
+            <option value="medium" selected>medium</option>
+            <option value="detailed">detailed</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="analyzeBtn">Analyze</button>
+      <div class="status" id="anStatus"><span class="dot"></span><span>Idle</span></div>
+      <div class="results" id="anResults"></div>
     </div>
   </div>
 
@@ -261,9 +288,9 @@
     const statusEl = document.getElementById("status");
     const resultsEl = document.getElementById("results");
     const loadBtn = document.getElementById("loadBtn");
-    const tokenInput = document.getElementById("token");
-    const getTokenBtn = document.getElementById("getTokenBtn");
-    const userIdInput = document.getElementById("userId");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const anStatusEl = document.getElementById("anStatus");
+    const anResultsEl = document.getElementById("anResults");
 
     function setStatus(text, kind) {
       const dotClass = kind === "ok" ? "ok" : kind === "err" ? "err" : "";
@@ -276,6 +303,21 @@
       return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
     }
 
+    function escapeHtml(value) {
+      const str = String(value ?? "");
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function renderExplanationHtml(text) {
+      const safe = escapeHtml(text);
+      return `<div class="explanation">${safe.replace(/\n/g, "<br/>")}</div>`;
+    }
+
     function renderArticles(data) {
       const articles = data.articles || [];
       if (!articles.length) {
@@ -283,7 +325,7 @@
         return;
       }
 
-      resultsEl.innerHTML = articles.map((a) => {
+      resultsEl.innerHTML = articles.map((a, idx) => {
         const chips = [];
         if (a.sentiment_label) chips.push(`<span class='chip'>${a.sentiment_label}</span>`);
         if (a.impact_level) chips.push(`<span class='chip'>Impact: ${a.impact_level}</span>`);
@@ -292,58 +334,111 @@
         return `
           <div class="item">
             <h3>${a.title || "Untitled"}</h3>
-            <div class="meta">${a.source_name || "Unknown source"} • ${fmtDate(a.published_at)} • Reliability: ${a.reliability_score ?? "n/a"}</div>
+            <div class="meta">${a.source_name || "Unknown source"} • ${fmtDate(a.published_at)}</div>
             <div>${a.summary || "No summary"}</div>
             <div class="chips">${chips.join("")}</div>
+            <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+              <button class="secondary analyze-item-btn" data-idx="${idx}">Analyze</button>
+              <span class="meta" id="anItemStatus-${idx}"></span>
+            </div>
+            <div class="item" style="margin-top:8px; display:none;" id="anItemResult-${idx}"></div>
           </div>
         `;
       }).join("");
-    }
 
-    async function getToken() {
-      const userId = userIdInput.value.trim() || "550e8400-e29b-41d4-a716-446655440000";
-      
-      try {
-        const res = await fetch("/api/v1/auth/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId, role: "student" })
+      const buttons = resultsEl.querySelectorAll(".analyze-item-btn");
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const idx = Number(btn.dataset.idx);
+          const article = articles[idx];
+          const statusEl = document.getElementById(`anItemStatus-${idx}`);
+          const resultEl = document.getElementById(`anItemResult-${idx}`);
+          if (!article) return;
+
+          const detail = document.getElementById("explanationDetail").value;
+          const title = article.title || "";
+          const content = article.summary || article.title || "";
+          const ticker = Array.isArray(article.tickers) && article.tickers.length ? article.tickers[0] : "";
+
+          if (!title || !content) {
+            statusEl.textContent = "Missing title/content.";
+            return;
+          }
+
+          const analyzeMode = "full";
+          statusEl.textContent = "Analyzing (full)...";
+          resultEl.style.display = "none";
+          resultEl.innerHTML = "";
+
+          try {
+            const res = await fetch("/api/v1/news/analyze", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title,
+                content,
+                ticker: ticker || undefined,
+                  analysis_mode: analyzeMode,
+                  explanation_detail: detail,
+                  explanation_format: "paragraph"
+                })
+              });
+            const data = await res.json();
+            if (!res.ok) {
+              statusEl.textContent = `Error ${res.status}`;
+              return;
+            }
+
+            const lines = [];
+            lines.push(`<div class='meta'>Sentiment: ${data.sentiment_label ?? "n/a"} (${data.sentiment_score ?? "n/a"})</div>`);
+            lines.push(`<div class='meta'>Impact: ${data.impact_level ?? "n/a"} (${data.impact_score ?? "n/a"})</div>`);
+            if (data.ai_explanation) {
+              lines.push(renderExplanationHtml(data.ai_explanation));
+            } else {
+              lines.push("<div>No explanation returned.</div>");
+            }
+            if (data.ai_explanation_is_fallback !== undefined && data.ai_explanation_is_fallback !== null) {
+              lines.push(`<div class='meta'>Fallback: ${data.ai_explanation_is_fallback}</div>`);
+            }
+
+            resultEl.innerHTML = lines.join("");
+            resultEl.style.display = "block";
+            statusEl.textContent = "Done.";
+          } catch (err) {
+            statusEl.textContent = `Network error: ${err.message}`;
+          }
         });
-        
-        if (!res.ok) {
-          const err = await res.json();
-          setStatus(`Token error: ${err.detail || res.status}`, "err");
-          return;
-        }
-        
-        const data = await res.json();
-        tokenInput.value = data.access_token;
-        setStatus("Token generated successfully!", "ok");
-      } catch (err) {
-        setStatus(`Error: ${err.message}`, "err");
-      }
+      });
     }
 
     async function loadFeed() {
-      const token = tokenInput.value.trim();
-      const tier = document.getElementById("tier").value;
       const tickersRaw = document.getElementById("tickers").value.trim();
-      const sector = document.getElementById("sector").value.trim();
+      const companyNamesRaw = document.getElementById("companyNames").value.trim();
+      const market = document.getElementById("market").value.trim();
       const limit = document.getElementById("limit").value || "10";
+      const timeWindow = document.getElementById("timeWindow").value || "24";
+      const explanationDetail = document.getElementById("explanationDetail").value;
+      const sourcesRaw = document.getElementById("sources").value.trim();
 
-      const params = new URLSearchParams();
-      params.set("tier", tier);
-      params.set("limit", limit);
+      const tickers = tickersRaw.split(",").map(t => t.trim()).filter(Boolean);
+      const companyNames = companyNamesRaw
+        ? companyNamesRaw.split(",").map(n => n.trim()).filter(Boolean)
+        : [];
+      const sources = sourcesRaw ? sourcesRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
 
-      if (tickersRaw) {
-        tickersRaw.split(",").map(t => t.trim()).filter(Boolean).forEach(t => params.append("tickers", t));
-      }
+      const payload = {
+        tickers,
+        company_names: companyNames.length ? companyNames : undefined,
+        market: market || undefined,
+        time_window_hours: Number(timeWindow),
+        limit: Number(limit),
+        analysis_mode: "fast",
+        explanation_detail: explanationDetail,
+        explanation_format: "paragraph",
+        sources: sources.length ? sources : undefined
+      };
 
-      if (sector) {
-        params.set("sector", sector);
-      }
-
-      const url = `/api/v1/news/feed?${params.toString()}`;
+      const url = `/api/v1/news/feed`;
       setStatus("Loading...", "");
       resultsEl.innerHTML = "";
 
@@ -351,12 +446,7 @@
         const headers = {
           "Content-Type": "application/json"
         };
-
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        const res = await fetch(url, { headers });
+        const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
         const data = await res.json();
 
         if (!res.ok) {
@@ -373,8 +463,73 @@
     }
 
     loadBtn.addEventListener("click", loadFeed);
-    getTokenBtn.addEventListener("click", getToken);
 
+    function setAnalyzeStatus(text, kind) {
+      const dotClass = kind === "ok" ? "ok" : kind === "err" ? "err" : "";
+      anStatusEl.innerHTML = `<span class="dot ${dotClass}"></span><span>${text}</span>`;
+    }
+
+    function renderAnalyzeResult(data) {
+      if (!data) {
+        anResultsEl.innerHTML = "<div class='item'>No response.</div>";
+        return;
+      }
+      const lines = [];
+      lines.push(`<div class='meta'>Sentiment: ${data.sentiment_label ?? "n/a"} (${data.sentiment_score ?? "n/a"})</div>`);
+      lines.push(`<div class='meta'>Impact: ${data.impact_level ?? "n/a"} (${data.impact_score ?? "n/a"})</div>`);
+      if (data.ai_explanation) {
+        lines.push(renderExplanationHtml(data.ai_explanation));
+      } else {
+        lines.push("<div>No explanation returned.</div>");
+      }
+      if (data.ai_explanation_is_fallback !== undefined && data.ai_explanation_is_fallback !== null) {
+        lines.push(`<div class='meta'>Fallback: ${data.ai_explanation_is_fallback}</div>`);
+      }
+      anResultsEl.innerHTML = `<div class='item'>${lines.join("")}</div>`;
+    }
+
+    async function analyzeText() {
+      const title = document.getElementById("anTitle").value.trim();
+      const content = document.getElementById("anContent").value.trim();
+      const ticker = document.getElementById("anTicker").value.trim();
+      const detail = document.getElementById("anDetail").value;
+
+      if (!title || !content) {
+        setAnalyzeStatus("Title and content required.", "err");
+        return;
+      }
+
+      const payload = {
+        title,
+        content,
+        ticker: ticker || undefined,
+        analysis_mode: "full",
+        explanation_detail: detail,
+        explanation_format: "paragraph"
+      };
+
+      setAnalyzeStatus("Analyzing...", "");
+      anResultsEl.innerHTML = "";
+
+      try {
+        const res = await fetch("/api/v1/news/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setAnalyzeStatus(`Error ${res.status}: ${data.detail || "Request failed"}`, "err");
+          return;
+        }
+        setAnalyzeStatus("Success.", "ok");
+        renderAnalyzeResult(data);
+      } catch (err) {
+        setAnalyzeStatus(`Network error: ${err.message}`, "err");
+      }
+    }
+
+    analyzeBtn.addEventListener("click", analyzeText);
     (async () => {
       try {
         const res = await fetch("/health");
